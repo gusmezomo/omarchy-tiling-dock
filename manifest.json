@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "id": "gusmezomo.dock",
-  "name": "Dock (tiling + floating)",
+  "name": "Tiling Dock",
   "version": "1.0.0",
-  "author": "Omarchy",
-  "description": "Omarchy dock shown on tiled and floating workspaces",
+  "author": "gusmezomo",
+  "description": "The Omarchy dock on every workspace, tiled or floating, with macOS-style pinned apps, a separator for running apps, and smart auto-hide.",
   "kinds": [
     "service",
     "menu"

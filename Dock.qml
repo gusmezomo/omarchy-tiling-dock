@@ -5,9 +5,9 @@ import Quickshell.Io
 import qs.Commons
 import "DockModel.js" as DockModel
 
-// An app dock that shows on floating workspaces. A floating workspace has no
-// tiles to hand the apps out, so the dock gives back a place to find them:
-// pinned apps, running apps, and a grid of every app.
+// Tiling Dock: the Omarchy app dock on every workspace, tiled or floating.
+// Pinned apps come first in pin order, running apps follow after a separator,
+// and a grid of every app is one click away.
 Item {
   id: root
 
