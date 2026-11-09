@@ -15,8 +15,30 @@ Item {
   property var manifest: null
 
   readonly property var appLibrary: shell ? shell.appLibrary : null
-  readonly property var dockConfig: shell && shell.shellConfig && shell.shellConfig.dock ? shell.shellConfig.dock : ({})
-  readonly property var defaultDockConfig: shell && shell.defaultsConfig && shell.defaultsConfig.dock ? shell.defaultsConfig.dock : ({})
+  // A cloned plugin gets a scoped shell without shellConfig/defaultsConfig, so
+  // the dock settings are read straight from shell.json.
+  property var userShellConfig: ({})
+  property var defaultShellConfig: ({})
+  readonly property var dockConfig: shell && shell.shellConfig && shell.shellConfig.dock ? shell.shellConfig.dock
+    : (userShellConfig && userShellConfig.dock ? userShellConfig.dock : ({}))
+  readonly property var defaultDockConfig: shell && shell.defaultsConfig && shell.defaultsConfig.dock ? shell.defaultsConfig.dock
+    : (defaultShellConfig && defaultShellConfig.dock ? defaultShellConfig.dock : ({}))
+
+  function parseJson(text) {
+    try { var value = JSON.parse(text); return value && typeof value === "object" ? value : ({}) } catch (e) { return ({}) }
+  }
+
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: root.userShellConfig = root.parseJson(text())
+  }
+
+  FileView {
+    path: (Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy") + "/config/omarchy/shell.json"
+    onLoaded: root.defaultShellConfig = root.parseJson(text())
+  }
   readonly property string position: DockModel.normalizePosition(dockConfig.position)
   readonly property bool vertical: DockModel.isVertical(position)
   readonly property bool autohide: dockConfig.autohide === true
@@ -76,7 +98,22 @@ Item {
       })
     }
 
-    return DockModel.orderItems(DockModel.buildItems(pinned, windows), root.order)
+    // macOS-style: pinned apps always first, in pin order; apps that are only
+    // running follow after a separator, in the order the session gave them.
+    var ordered = DockModel.orderItems(DockModel.buildItems(pinned, windows), root.order)
+    var running = ordered.filter(function(item) { return !item.pinned })
+    var pinnedItems = pinned.map(function(id) {
+      for (var k = 0; k < ordered.length; k++) if (ordered[k].key === id) return ordered[k]
+      return null
+    }).filter(function(item) { return !!item })
+    return pinnedItems.concat(running)
+  }
+
+  // How many slots the pinned apps take; the separator goes after them.
+  readonly property int pinnedCount: {
+    var count = 0
+    for (var i = 0; i < root.items.length; i++) if (root.items[i].pinned) count++
+    return count
   }
 
   readonly property var itemsByKey: {

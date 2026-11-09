@@ -1,15 +1,17 @@
 {
   "schemaVersion": 1,
   "id": "gusmezomo.dock",
-  "name": "My Dock",
+  "name": "Dock (tiling + floating)",
   "version": "1.0.0",
   "author": "Omarchy",
-  "description": "App dock shown on floating workspaces",
+  "description": "Omarchy dock shown on tiled and floating workspaces",
   "kinds": [
-    "service"
+    "service",
+    "menu"
   ],
   "entryPoints": {
-    "service": "Dock.qml"
+    "service": "Dock.qml",
+    "menu": "Menu.qml"
   },
   "omarchy": {
     "clonedFrom": "omarchy.dock"

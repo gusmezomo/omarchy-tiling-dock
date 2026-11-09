@@ -37,11 +37,22 @@ PanelWindow {
     }
     return mode
   }
-  readonly property bool shown: !!dock && dock.isFloating(workspaceId) && fullscreenMode < 2
+  // Shown on every workspace, tiled or floating (the stock dock only shows on floating ones).
+  readonly property bool shown: !!dock && fullscreenMode < 2
   // With auto-hide on, the dock waits off screen until the pointer reaches its
   // edge, and stays while the pointer, a menu, or a drag still needs it. A
   // maximized window hides the dock the same way, so it can still be called up.
-  readonly property bool autohide: !!dock && (dock.autohide || fullscreenMode === 1)
+  // Windows on this monitor's active workspace. With auto-hide on, an empty
+  // workspace keeps the dock on screen; it only tucks away once an app is open.
+  readonly property int workspaceWindowCount: {
+    var count = 0
+    var toplevels = Hyprland.toplevels.values
+    for (var i = 0; i < toplevels.length; i++) {
+      if (toplevels[i].workspace && toplevels[i].workspace.id === workspaceId) count++
+    }
+    return count
+  }
+  readonly property bool autohide: !!dock && ((dock.autohide && workspaceWindowCount > 0) || fullscreenMode === 1)
   property bool revealed: false
   readonly property bool menuOpen: menuItem !== null || settingsMenu
   readonly property bool tucked: autohide && !(revealed || menuOpen || dragging || insertIndex >= 0)
@@ -305,6 +316,26 @@ PanelWindow {
         var at = point.position
         if (Math.hypot(at.x - window.dropPoint.x, at.y - window.dropPoint.y) > Style.space(4)) window.hoverStale = false
       }
+    }
+
+    // macOS-style divider between the pinned apps and the ones only running.
+    // It sits in the padding between two icons, so slots keep their size and
+    // drag math stays the same. The apps button takes the first slot.
+    Rectangle {
+      readonly property int pinned: window.dock ? window.dock.pinnedCount : 0
+      readonly property real boundary: (1 + pinned) * window.slotSize
+      readonly property int thickness: Math.max(1, Math.round(Style.fontScale))
+      readonly property real length: Math.round(window.iconSize * 0.8)
+
+      visible: pinned > 0 && appRepeater.count > pinned && !window.dragging && window.insertIndex < 0
+      z: 2
+      color: Commons.Color.bar.text
+      opacity: 0.55
+      radius: thickness / 2
+      x: slots.x + (window.vertical ? (slots.width - length) / 2 : boundary - thickness / 2)
+      y: slots.y + (window.vertical ? boundary - thickness / 2 : (slots.height - length) / 2)
+      width: window.vertical ? length : thickness
+      height: window.vertical ? thickness : length
     }
 
     Grid {
