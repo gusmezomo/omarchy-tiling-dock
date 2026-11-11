@@ -64,11 +64,15 @@ PanelWindow {
   // straight to the edge of the dock.
   readonly property int iconInset: Style.spacing.md
   readonly property int slotSize: iconSize + iconInset * 2
-  // A pinned app that is not running is drawn faded.
-  readonly property real idleOpacity: 0.7
+  // A pinned app that is not running is drawn faded, but not so far that it
+  // gets lost against the wallpaper.
+  readonly property real idleOpacity: 0.85
+  // The panel behind the icons: none, glassy or opaque.
+  readonly property string background: dock ? dock.background : "none"
+  readonly property real glassOpacity: dock ? dock.glassOpacity : 0.4
   // Room inward of the dock for its menus: the tallest, the apps button's,
-  // has five rows.
-  readonly property int popupRoom: Style.spacing.popupRowHeight * 5 + Style.spacing.sm * 2 + Style.normalBorderWidth * 2 + gap * 2
+  // has eight rows.
+  readonly property int popupRoom: Style.spacing.popupRowHeight * 8 + Style.spacing.sm * 2 + Style.normalBorderWidth * 2 + gap * 2
   // Icons pop away from the screen edge.
   readonly property int popOrigin: position === "top" ? Item.Top
     : position === "left" ? Item.Left
@@ -316,6 +320,30 @@ PanelWindow {
         var at = point.position
         if (Math.hypot(at.x - window.dropPoint.x, at.y - window.dropPoint.y) > Style.space(4)) window.hoverStale = false
       }
+    }
+
+    // macOS-style panel behind the icons, in the bar's color so it follows the
+    // theme. Glassy lets the wallpaper show through by dock.glassOpacity. The
+    // blur rule ignores only fully clear pixels, so Hyprland blurs behind the
+    // panel at any opacity and not the clear rest of the surface. The slots'
+    // own padding is the panel's margin around the icons.
+    Rectangle {
+      id: panel
+
+      property color base: Commons.Color.bar.background
+      readonly property color edge: Commons.Color.bar.text
+
+      visible: window.background !== "none"
+      z: -1
+      anchors.fill: parent
+      radius: Math.round(window.slotSize * 0.3)
+      color: window.background === "glassy" ? Qt.rgba(base.r, base.g, base.b, window.glassOpacity) : Qt.rgba(base.r, base.g, base.b, 1)
+      border.width: Math.max(1, Math.round(Style.fontScale))
+      border.color: Qt.rgba(edge.r, edge.g, edge.b, window.background === "glassy" ? 0.18 : 0.1)
+      antialiasing: true
+
+      // A theme change cross-fades the panel, like the bar.
+      Behavior on base { ColorAnimation { duration: Style.duration(250); easing.type: Easing.OutCubic } }
     }
 
     // macOS-style divider between the pinned apps and the ones only running.
@@ -601,6 +629,19 @@ PanelWindow {
         text: Commons.I18n.t("dock.autoHide")
         checked: window.autohide
         onTriggered: Util.execDetached("omarchy-dock autohide " + (window.autohide ? "off" : "on"))
+      }
+
+      Repeater {
+        model: [["none", Commons.I18n.t("dock.backgroundNone", "No Background")], ["glassy", Commons.I18n.t("dock.backgroundGlassy", "Glassy Background")], ["opaque", Commons.I18n.t("dock.backgroundOpaque", "Opaque Background")]]
+
+        delegate: MenuRow {
+          required property var modelData
+
+          visible: window.settingsMenu
+          text: modelData[1]
+          checked: window.background === modelData[0]
+          onTriggered: window.dock.setBackground(modelData[0])
+        }
       }
 
       MenuRow {

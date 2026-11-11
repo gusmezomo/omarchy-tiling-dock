@@ -32,7 +32,11 @@ Item {
     path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
     watchChanges: true
     onFileChanged: reload()
-    onLoaded: root.userShellConfig = root.parseJson(text())
+    onLoaded: {
+      root.userShellConfig = root.parseJson(text())
+      root.configReady = true
+    }
+    onLoadFailed: root.configReady = true
   }
 
   FileView {
@@ -42,6 +46,37 @@ Item {
   readonly property string position: DockModel.normalizePosition(dockConfig.position)
   readonly property bool vertical: DockModel.isVertical(position)
   readonly property bool autohide: dockConfig.autohide === true
+
+  // The panel behind the icons: none, glassy or opaque. Glassy needs a Hyprland
+  // blur rule, which dock-background keeps in step with the setting, so one set
+  // by editing shell.json gets its blur too.
+  readonly property string background: dockConfig.background === "glassy" || dockConfig.background === "opaque"
+    ? dockConfig.background : "none"
+  // How much of the glassy panel's color shows, 0 to 100: lower is more
+  // see-through. Anything else falls back to 40.
+  readonly property real glassOpacity: {
+    var value = Number(dockConfig.glassOpacity)
+    if (dockConfig.glassOpacity === undefined || dockConfig.glassOpacity === null || isNaN(value)) return 0.4
+    return Math.max(0, Math.min(100, value)) / 100
+  }
+  readonly property string backgroundScript: decodeURIComponent(Qt.resolvedUrl("dock-background").toString().replace(/^file:\/\//, ""))
+  // Until shell.json is read the setting reads as none, and syncing then would
+  // drop a glassy dock's blur for a moment.
+  property bool configReady: !!(shell && shell.shellConfig)
+  property string syncedBackground: ""
+
+  function setBackground(value) {
+    Util.execDetached("bash " + Util.shellQuote(root.backgroundScript) + " " + Util.shellQuote(value))
+  }
+
+  function syncBackground() {
+    if (!root.configReady || root.background === root.syncedBackground) return
+    root.syncedBackground = root.background
+    Util.execDetached("bash " + Util.shellQuote(root.backgroundScript) + " sync")
+  }
+
+  onBackgroundChanged: syncBackground()
+  onConfigReadyChanged: syncBackground()
 
   // The dock's order for the session, as desktop ids, set when the user moves
   // an app: a drag moves it, and keeping it in the dock puts it at the end. An
@@ -349,6 +384,7 @@ Item {
   Component.onCompleted: {
     refresh()
     syncItemModel()
+    syncBackground()
   }
 
   Process {

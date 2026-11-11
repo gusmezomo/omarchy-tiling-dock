@@ -1,0 +1,114 @@
+#!/bin/bash
+
+# Tiling Dock: the panel drawn behind the dock's icons.
+#
+#   none     no panel, the icons sit straight on the wallpaper (the default)
+#   glassy   a see-through panel in the bar's color that Hyprland blurs behind
+#   opaque   a solid panel in the bar's color
+#
+# Glassy needs Hyprland to blur behind the dock, which it only does with a layer
+# rule. This script keeps that rule in the Omarchy toggles folder while the dock
+# is glassy and removes it otherwise. Nothing in ~/.config/hypr is touched.
+
+set -euo pipefail
+
+source omarchy-shell-config
+
+TOGGLE="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/toggles/hypr/dock-glassy.lua"
+
+usage() {
+  cat <<USAGE
+Usage: dock-background [none|glassy|opaque|cycle|sync]
+       dock-background opacity [0-100]
+
+  (no argument)               Prints the current background
+  none | glassy | opaque      Sets the background behind the dock's icons
+  cycle                       Steps none, glassy, opaque and around
+  opacity [0-100]             How much of the glassy panel's color shows:
+                              lower is more see-through (default 40); prints
+                              the current value when given none
+  sync                        Adds or removes the Hyprland blur rule to match
+                              shell.json (the dock runs this when it loads)
+USAGE
+}
+
+current_background() {
+  jq -r '.dock.background // "none" | if . == "glassy" or . == "opaque" then . else "none" end' "$(source_file)"
+}
+
+toggle_contents() {
+  cat <<'LUA'
+-- Tiling Dock (gusmezomo.dock): the glassy dock. The dock draws a see-through
+-- panel behind its icons, and Hyprland blurs what is behind it. Written while
+-- dock.background is "glassy" and removed otherwise; see the plugin's README.
+require("default.hypr.glass")()
+
+hl.layer_rule({
+  match = { namespace = "^omarchy-dock$" },
+  blur = true,
+  ignore_alpha = 0.01,
+})
+LUA
+}
+
+# Only reloads Hyprland when the rule actually changes, so the dock can run it
+# on every load.
+sync_glass() {
+  if [[ $(current_background) == "glassy" ]]; then
+    if [[ -f $TOGGLE ]] && [[ $(cat "$TOGGLE") == "$(toggle_contents)" ]]; then
+      return 0
+    fi
+    mkdir -p "$(dirname "$TOGGLE")"
+    toggle_contents >"$TOGGLE"
+  else
+    [[ -f $TOGGLE ]] || return 0
+    rm -f "$TOGGLE"
+  fi
+
+  omarchy-restart-hyprctl
+}
+
+cmd_set() {
+  local background="$1"
+  if [[ $background == "cycle" ]]; then
+    case $(current_background) in
+      none) background="glassy" ;;
+      glassy) background="opaque" ;;
+      *) background="none" ;;
+    esac
+  fi
+  [[ $background =~ ^(none|glassy|opaque)$ ]] || fail "background must be none, glassy, opaque, or cycle"
+
+  commit "$NORMALIZE | .dock = (.dock // {}) | .dock.background = \$background" --arg background "$background"
+  sync_glass || fail "could not change the blur behind the dock"
+  echo "Dock background set to $background"
+}
+
+cmd_opacity() {
+  if (( $# == 0 )); then
+    jq -r '.dock.glassOpacity // 40' "$(source_file)"
+    return
+  fi
+  (( $# == 1 )) || fail "opacity takes a single value"
+  [[ $1 =~ ^[0-9]+$ ]] && (( $1 <= 100 )) || fail "opacity must be a whole number from 0 to 100"
+  commit "$NORMALIZE | .dock = (.dock // {}) | .dock.glassOpacity = \$value" --argjson value "$1"
+  echo "Dock glass opacity set to $1"
+}
+
+case "${1:-}" in
+  "") current_background ;;
+  none | glassy | opaque | cycle)
+    (( $# == 1 )) || fail "takes a single value"
+    cmd_set "$1"
+    ;;
+  opacity)
+    shift
+    cmd_opacity "$@"
+    ;;
+  sync) sync_glass || fail "could not change the blur behind the dock" ;;
+  -h | --help | help) usage ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
