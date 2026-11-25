@@ -73,9 +73,11 @@ PanelWindow {
   readonly property real glassOpacity: dock ? dock.glassOpacity : 0.4
   readonly property string iconColors: dock ? dock.iconColors : "original"
   readonly property real themeTint: dock ? dock.themeTint : 1
-  // Room inward of the dock for its menus: the tallest, the apps button's,
-  // has eight rows.
-  readonly property int popupRoom: Style.spacing.popupRowHeight * 8 + Style.spacing.sm * 2 + Style.normalBorderWidth * 2 + gap * 2
+  // Room inward of the dock for its menus: an app's menu has up to three rows,
+  // and the apps button's settings strip is as deep as its groups.
+  readonly property int appMenuDepth: vertical ? Style.space(180)
+    : Style.spacing.popupRowHeight * 3 + Style.spacing.sm * 2 + Style.normalBorderWidth * 2
+  readonly property int popupRoom: Math.max(appMenuDepth, vertical ? settingsPanel.width : settingsPanel.height) + gap * 2
   // Icons pop away from the screen edge.
   readonly property int popOrigin: position === "top" ? Item.Top
     : position === "left" ? Item.Left
@@ -232,6 +234,7 @@ PanelWindow {
 
     Region { item: window.shown && window.autohide ? edgeTrigger : null }
     Region { item: menu.visible ? menu : null }
+    Region { item: settingsPanel.visible ? settingsPanel : null }
   }
 
   onAutohideChanged: window.revealed = false
@@ -618,7 +621,7 @@ PanelWindow {
     readonly property bool hasEntry: !!item && !!window.dock && !!window.dock.entryFor(item)
     readonly property bool running: !!item && item.windows.length > 0
 
-    visible: window.contentShown && (!!item || window.settingsMenu)
+    visible: window.contentShown && !!item
     width: Math.max(Style.space(140), menuColumn.implicitWidth) + padding * 2
     height: menuColumn.implicitHeight + padding * 2
     x: window.popupX(window.menuSlot, menu)
@@ -633,52 +636,6 @@ PanelWindow {
       x: menu.contentLeftInset
       y: menu.contentTopInset
       width: menu.width - menu.contentLeftInset - menu.contentRightInset
-
-      Repeater {
-        model: [["top", Commons.I18n.t("dock.positionTop")], ["bottom", Commons.I18n.t("dock.positionBottom")], ["left", Commons.I18n.t("dock.positionLeft")], ["right", Commons.I18n.t("dock.positionRight")]]
-
-        delegate: MenuRow {
-          required property var modelData
-
-          visible: window.settingsMenu
-          text: modelData[1]
-          checked: window.position === modelData[0]
-          onTriggered: Util.execDetached("omarchy-dock position " + modelData[0])
-        }
-      }
-
-      MenuRow {
-        visible: window.settingsMenu
-        text: Commons.I18n.t("dock.autoHide")
-        checked: window.autohide
-        onTriggered: Util.execDetached("omarchy-dock autohide " + (window.autohide ? "off" : "on"))
-      }
-
-      Repeater {
-        model: [["none", Commons.I18n.t("dock.backgroundNone", "No Background")], ["glassy", Commons.I18n.t("dock.backgroundGlassy", "Glassy Background")], ["opaque", Commons.I18n.t("dock.backgroundOpaque", "Opaque Background")]]
-
-        delegate: MenuRow {
-          required property var modelData
-
-          visible: window.settingsMenu
-          text: modelData[1]
-          checked: window.background === modelData[0]
-          onTriggered: window.dock.setBackground(modelData[0])
-        }
-      }
-
-      Repeater {
-        model: [["original", Commons.I18n.t("dock.iconsOriginal", "Original Icon Colors")], ["theme", Commons.I18n.t("dock.iconsTheme", "Theme Icon Colors")], ["mono", Commons.I18n.t("dock.iconsMono", "Black & White Icons")]]
-
-        delegate: MenuRow {
-          required property var modelData
-
-          visible: window.settingsMenu
-          text: modelData[1]
-          checked: window.iconColors === modelData[0]
-          onTriggered: window.dock.setIconColors(modelData[0])
-        }
-      }
 
       MenuRow {
         visible: menu.hasEntry && menu.running
@@ -697,6 +654,111 @@ PanelWindow {
         text: Commons.I18n.t("dock.quit")
         onTriggered: window.dock.quit(menu.item)
       }
+    }
+  }
+
+  // The apps button's settings: a strip like a small dock over the dock, one
+  // group per setting side by side (stacked beside a dock on the left or right).
+  // Picking an option keeps it open so the change can be seen; moving the dock
+  // closes it, since the strip would be left where the dock was.
+  BorderSurface {
+    id: settingsPanel
+
+    visible: window.contentShown && window.settingsMenu
+    width: settingsGrid.implicitWidth + padding * 2
+    height: settingsGrid.implicitHeight + padding * 2
+    x: window.popupX(body, settingsPanel)
+    y: window.popupY(body, settingsPanel)
+    radius: Style.cornerRadius
+    color: Commons.Color.popups.background
+    borderSpec: Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Style.normalBorderWidth)
+    padding: Style.spacing.lg
+
+    Grid {
+      id: settingsGrid
+
+      x: settingsPanel.contentLeftInset
+      y: settingsPanel.contentTopInset
+      columns: window.vertical ? 1 : 4
+      columnSpacing: Style.spacing.huge
+      rowSpacing: Style.spacing.lg
+
+      SettingGroup {
+        title: Commons.I18n.t("dock.position", "Position")
+        options: [
+          { value: "top", label: Commons.I18n.t("dock.positionTop", "Top") },
+          { value: "bottom", label: Commons.I18n.t("dock.positionBottom", "Bottom") },
+          { value: "left", label: Commons.I18n.t("dock.positionLeft", "Left") },
+          { value: "right", label: Commons.I18n.t("dock.positionRight", "Right") }
+        ]
+        value: window.position
+        onPicked: function(value) {
+          Util.execDetached("omarchy-dock position " + value)
+          window.closeMenu()
+        }
+      }
+
+      SettingGroup {
+        readonly property bool on: !!window.dock && window.dock.autohide
+        title: Commons.I18n.t("dock.autoHide", "Auto-hide")
+        options: [
+          { value: "on", label: Commons.I18n.t("dock.on", "On") },
+          { value: "off", label: Commons.I18n.t("dock.off", "Off") }
+        ]
+        value: on ? "on" : "off"
+        onPicked: function(value) { Util.execDetached("omarchy-dock autohide " + value) }
+      }
+
+      SettingGroup {
+        title: Commons.I18n.t("dock.background", "Background")
+        options: [
+          { value: "none", label: Commons.I18n.t("dock.backgroundNoneShort", "None") },
+          { value: "glassy", label: Commons.I18n.t("dock.backgroundGlassyShort", "Glassy") },
+          { value: "opaque", label: Commons.I18n.t("dock.backgroundOpaqueShort", "Opaque") }
+        ]
+        value: window.background
+        onPicked: function(value) { window.dock.setBackground(value) }
+      }
+
+      SettingGroup {
+        title: Commons.I18n.t("dock.iconColors", "Icons")
+        options: [
+          { value: "original", label: Commons.I18n.t("dock.iconsOriginalShort", "Original") },
+          { value: "theme", label: Commons.I18n.t("dock.iconsThemeShort", "Theme") },
+          { value: "mono", label: Commons.I18n.t("dock.iconsMonoShort", "B&W") }
+        ]
+        value: window.iconColors
+        onPicked: function(value) { window.dock.setIconColors(value) }
+      }
+    }
+  }
+
+  component SettingGroup: Column {
+    id: group
+
+    property string title: ""
+    property var options: []
+    property string value: ""
+    signal picked(string value)
+
+    spacing: Style.spacing.sm
+
+    Text {
+      leftPadding: Style.spacing.xxs
+      textFormat: Text.PlainText
+      text: group.title
+      color: Commons.Color.muted
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+    }
+
+    ButtonGroup {
+      options: group.options
+      value: group.value
+      focusable: false
+      foreground: Commons.Color.popups.text
+      background: Commons.Color.popups.background
+      onChanged: function(value) { group.picked(value) }
     }
   }
 

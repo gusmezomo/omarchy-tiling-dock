@@ -63,6 +63,14 @@ Or edit `~/.config/omarchy/shell.json` directly:
 
 Pinned entries are desktop file ids (the `.desktop` file name without the extension).
 
+### Settings strip
+
+Right-click the apps button (the grid at the start of the dock) to open the
+dock's settings: a strip that opens over the dock like a small dock of its own,
+with the position, auto-hide, background and icon colors side by side. It stays
+open while you try options, and closes when you click outside it or move the
+dock. Next to a dock on the left or right, the groups stack instead.
+
 ### Background
 
 The panel behind the icons can be one of three styles:
@@ -73,9 +81,7 @@ The panel behind the icons can be one of three styles:
 | `glassy` | A see-through panel that blurs the wallpaper behind it, like the macOS Dock |
 | `opaque` | A solid panel in the bar's color |
 
-Pick one from the dock itself: right-click the apps button (the grid at the
-start of the dock) and choose **No Background**, **Glassy Background** or
-**Opaque Background**. You can also set `"background"` in the `dock` section of
+Pick one under **Background** in the settings strip. You can also set `"background"` in the `dock` section of
 `~/.config/omarchy/shell.json`, or use the script that ships with the plugin:
 
 ```bash
@@ -147,8 +153,7 @@ The app icons can keep their own colors or be recolored:
 | `theme` | The icons tinted with the Omarchy theme's accent color, changing along with the theme |
 | `mono` | The icons in black and white |
 
-Pick one from the same apps button menu (**Original Icon Colors**, **Theme Icon
-Colors** or **Black & White Icons**), set `"iconColors"` in the `dock` section
+Pick one under **Icons** in the settings strip, set `"iconColors"` in the `dock` section
 of `shell.json`, or use the script:
 
 ```bash
@@ -196,8 +201,8 @@ it. The changes are:
 
 - `DockWindow.qml` no longer needs the workspace to be floating to show the dock.
   Auto-hide only applies when the active workspace has windows. It also draws
-  the separator between pinned and running apps, the optional background panel
-  and its menu entries, and fades idle pinned apps less (85% instead of 70%).
+  the separator between pinned and running apps, the optional background panel,
+  the settings strip that replaces the apps button's menu, and fades idle pinned apps less (85% instead of 70%).
 - `Dock.qml` always lists pinned apps first, in pin order, and the running apps
   after them. It reads the dock settings straight from `shell.json`, because
   cloned plugins don't get the shell's config object. It also keeps the blur
