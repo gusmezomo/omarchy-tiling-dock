@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "id": "gusmezomo.dock",
   "name": "Tiling Dock",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "gusmezomo",
-  "description": "The Omarchy dock on every workspace, tiled or floating, with macOS-style pinned apps, a separator for running apps, smart auto-hide, and an optional glassy or opaque background.",
+  "description": "The Omarchy dock on every workspace, tiled or floating, with macOS-style pinned apps, a separator for running apps, smart auto-hide, an optional glassy or opaque background, and theme-tinted or black-and-white icons.",
   "kinds": [
     "service",
     "menu"
