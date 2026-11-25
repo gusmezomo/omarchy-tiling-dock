@@ -59,7 +59,24 @@ Item {
     if (dockConfig.glassOpacity === undefined || dockConfig.glassOpacity === null || isNaN(value)) return 0.4
     return Math.max(0, Math.min(100, value)) / 100
   }
-  readonly property string backgroundScript: decodeURIComponent(Qt.resolvedUrl("dock-background").toString().replace(/^file:\/\//, ""))
+  // How the app icons are colored: original, theme (tinted with the theme's
+  // accent color) or mono (black and white).
+  readonly property string iconColors: dockConfig.iconColors === "theme" || dockConfig.iconColors === "mono"
+    ? dockConfig.iconColors : "original"
+  // How strongly the theme tints the icons, 0 to 100: lower keeps more of their
+  // own colors. Anything else falls back to 100.
+  readonly property real themeTint: {
+    var value = Number(dockConfig.themeTint)
+    if (dockConfig.themeTint === undefined || dockConfig.themeTint === null || isNaN(value)) return 1
+    return Math.max(0, Math.min(100, value)) / 100
+  }
+  readonly property string iconsScript: decodeURIComponent(Qt.resolvedUrl("dock-icons").toString().replace(/^file:\/\//, ""))
+
+  function setIconColors(value) {
+    Util.execDetached("bash " + Util.shellQuote(root.iconsScript) + " " + Util.shellQuote(value))
+  }
+
+  readonly property string backgroundScript:decodeURIComponent(Qt.resolvedUrl("dock-background").toString().replace(/^file:\/\//, ""))
   // Until shell.json is read the setting reads as none, and syncing then would
   // drop a glassy dock's blur for a moment.
   property bool configReady: !!(shell && shell.shellConfig)

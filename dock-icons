@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# Tiling Dock: how the dock's app icons are colored.
+#
+#   original   the icons in their own colors (the default)
+#   theme      the icons tinted with the Omarchy theme's accent color, so they
+#              change along with the theme
+#   mono       the icons in black and white
+
+set -euo pipefail
+
+source omarchy-shell-config
+
+usage() {
+  cat <<USAGE
+Usage: dock-icons [original|theme|mono|cycle]
+       dock-icons tint [0-100]
+
+  (no argument)               Prints the current icon colors
+  original | theme | mono     Sets how the dock's icons are colored
+  cycle                       Steps original, theme, mono and around
+  tint [0-100]                How strongly theme colors tint the icons: lower
+                              keeps more of their own colors (default 100);
+                              prints the current value when given none
+USAGE
+}
+
+current_colors() {
+  jq -r '.dock.iconColors // "original" | if . == "theme" or . == "mono" then . else "original" end' "$(source_file)"
+}
+
+cmd_set() {
+  local colors="$1"
+  if [[ $colors == "cycle" ]]; then
+    case $(current_colors) in
+      original) colors="theme" ;;
+      theme) colors="mono" ;;
+      *) colors="original" ;;
+    esac
+  fi
+  [[ $colors =~ ^(original|theme|mono)$ ]] || fail "icon colors must be original, theme, mono, or cycle"
+
+  commit "$NORMALIZE | .dock = (.dock // {}) | .dock.iconColors = \$colors" --arg colors "$colors"
+  echo "Dock icon colors set to $colors"
+}
+
+cmd_tint() {
+  if (( $# == 0 )); then
+    jq -r '.dock.themeTint // 100' "$(source_file)"
+    return
+  fi
+  (( $# == 1 )) || fail "tint takes a single value"
+  [[ $1 =~ ^[0-9]+$ ]] && (( $1 <= 100 )) || fail "tint must be a whole number from 0 to 100"
+  commit "$NORMALIZE | .dock = (.dock // {}) | .dock.themeTint = \$value" --argjson value "$1"
+  echo "Dock theme tint set to $1"
+}
+
+case "${1:-}" in
+  "") current_colors ;;
+  original | theme | mono | cycle)
+    (( $# == 1 )) || fail "takes a single value"
+    cmd_set "$1"
+    ;;
+  tint)
+    shift
+    cmd_tint "$@"
+    ;;
+  -h | --help | help) usage ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac

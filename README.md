@@ -19,6 +19,8 @@ tiled or floating, and lays out your apps the way the macOS Dock does.
 - **Optional macOS-style background.** Put a frosted-glass or solid panel behind
   the icons, so the dock stays readable on busy wallpapers. The panel takes the
   bar's color, so it follows your theme.
+- **Icon colors.** Keep the icons in their own colors, tint them with your
+  theme's accent color, or make them black and white.
 - **Everything else from the stock dock still works.** You can drag to reorder,
   pin and unpin from the right-click menu, open the app grid, restore minimized
   windows, use any of the four positions, and see running indicators.
@@ -135,6 +137,35 @@ hl.layer_rule({
 Without the rule, glassy still draws the see-through panel, just without the
 blur.
 
+### Icon colors
+
+The app icons can keep their own colors or be recolored:
+
+| Value | Look |
+|---|---|
+| `original` | The icons in their own colors (the default) |
+| `theme` | The icons tinted with the Omarchy theme's accent color, changing along with the theme |
+| `mono` | The icons in black and white |
+
+Pick one from the same apps button menu (**Original Icon Colors**, **Theme Icon
+Colors** or **Black & White Icons**), set `"iconColors"` in the `dock` section
+of `shell.json`, or use the script:
+
+```bash
+~/.config/omarchy/plugins/gusmezomo.dock/dock-icons theme   # original | theme | mono | cycle
+```
+
+`themeTint` sets how strongly the theme tints the icons, from `0` to `100`.
+Lower keeps more of each icon's own colors; the default is `100`.
+
+```json
+"dock": { "iconColors": "theme", "themeTint": 60 }
+```
+
+```bash
+~/.config/omarchy/plugins/gusmezomo.dock/dock-icons tint 60
+```
+
 ## Update
 
 ```bash
@@ -173,6 +204,9 @@ it. The changes are:
   rule in step with the background setting through `dock-background`.
 - `dock-background` is a new script that sets the background in `shell.json` and
   adds or removes the Hyprland blur rule.
+- `dock-icons` is a new script that sets the icon colors (original, theme or
+  black and white) in `shell.json`; `DockWindow.qml` draws them with a
+  `MultiEffect` over each app icon.
 - `manifest.json` declares the `menu` kind, with a placeholder `Menu.qml`. That
   is what gives a third-party plugin access to the shell's app library, which is
   used to launch apps, load icons and build the app grid.

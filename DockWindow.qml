@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
@@ -70,6 +71,8 @@ PanelWindow {
   // The panel behind the icons: none, glassy or opaque.
   readonly property string background: dock ? dock.background : "none"
   readonly property real glassOpacity: dock ? dock.glassOpacity : 0.4
+  readonly property string iconColors: dock ? dock.iconColors : "original"
+  readonly property real themeTint: dock ? dock.themeTint : 1
   // Room inward of the dock for its menus: the tallest, the apps button's,
   // has eight rows.
   readonly property int popupRoom: Style.spacing.popupRowHeight * 8 + Style.spacing.sm * 2 + Style.normalBorderWidth * 2 + gap * 2
@@ -442,6 +445,16 @@ PanelWindow {
 
       Grid {
         readonly property int square: Math.round(window.iconSize * 0.22)
+        // Follows the icon colors like the app icons do: blended toward the
+        // theme's accent by themeTint, or the bar text's own gray in mono.
+        readonly property color base: Commons.Color.bar.text
+        readonly property color accent: Commons.Color.accent
+        readonly property real gray: 0.299 * base.r + 0.587 * base.g + 0.114 * base.b
+        readonly property color squareColor: window.iconColors === "theme"
+          ? Qt.rgba(base.r + (accent.r - base.r) * window.themeTint,
+                    base.g + (accent.g - base.g) * window.themeTint,
+                    base.b + (accent.b - base.b) * window.themeTint, base.a)
+          : window.iconColors === "mono" ? Qt.rgba(gray, gray, gray, base.a) : base
 
         anchors.centerIn: parent
         columns: 3
@@ -454,7 +467,7 @@ PanelWindow {
             width: parent.square
             height: parent.square
             radius: Math.max(1, Math.round(parent.square * 0.2))
-            color: Commons.Color.bar.text
+            color: parent.squareColor
           }
         }
       }
@@ -565,6 +578,16 @@ PanelWindow {
       asynchronous: true
       smooth: true
       mipmap: true
+      // Theme and mono colors are an effect over the icon. Its texture is
+      // twice the icon's size so the hover pop stays sharp.
+      layer.enabled: window.iconColors !== "original"
+      layer.smooth: true
+      layer.textureSize: Qt.size(width * 2, height * 2)
+      layer.effect: MultiEffect {
+        saturation: window.iconColors === "mono" ? -1 : 0
+        colorization: window.iconColors === "theme" ? window.themeTint : 0
+        colorizationColor: Commons.Color.accent
+      }
       opacity: appSlot.launching ? appSlot.pulse : (appSlot.windowCount > 0 ? 1 : window.idleOpacity)
       transform: Translate {
         x: window.vertical ? 0 : appSlot.displayedShift
@@ -641,6 +664,19 @@ PanelWindow {
           text: modelData[1]
           checked: window.background === modelData[0]
           onTriggered: window.dock.setBackground(modelData[0])
+        }
+      }
+
+      Repeater {
+        model: [["original", Commons.I18n.t("dock.iconsOriginal", "Original Icon Colors")], ["theme", Commons.I18n.t("dock.iconsTheme", "Theme Icon Colors")], ["mono", Commons.I18n.t("dock.iconsMono", "Black & White Icons")]]
+
+        delegate: MenuRow {
+          required property var modelData
+
+          visible: window.settingsMenu
+          text: modelData[1]
+          checked: window.iconColors === modelData[0]
+          onTriggered: window.dock.setIconColors(modelData[0])
         }
       }
 
